@@ -1318,7 +1318,7 @@ function AdminOrders() {
   const [orders, setOrders] = useState([])
   const [editing, setEditing] = useState(null)
   const reload = () => api('/orders').then(r=>setOrders(r.orders||[]))
-  useEffect(()=>reload(), [])
+  useEffect(()=>{ reload() }, [])
   const statuses = ['Enquiry Received','Confirmed','Processing','Shipped','Delivered','Cancelled']
   const save = async () => {
     try { await api(`/orders/${editing.id}`, { method:'PUT', body: { status: editing.status, trackingNumber: editing.trackingNumber, adminNotes: editing.adminNotes, historyNote: editing.historyNote } }); toast.success('Updated'); setEditing(null); reload() } catch (e) { toast.error(e.message) }
@@ -1372,7 +1372,7 @@ function AdminInquiries() {
   const [items, setItems] = useState([])
   const [editing, setEditing] = useState(null)
   const reload = () => api('/inquiries').then(r=>setItems(r.inquiries||[]))
-  useEffect(()=>reload(),[])
+  useEffect(()=>{ reload() },[])
   const save = async () => {
     try { await api(`/inquiries/${editing.id}`, { method:'PUT', body: { status: editing.status, response: editing.response } }); toast.success('Updated'); setEditing(null); reload() } catch (e) { toast.error(e.message) }
   }
