@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 97%;
+    --foreground: 20 14% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 8%;
+    --primary: 20 14% 8%;
+    --primary-foreground: 40 33% 97%;
+    --secondary: 35 20% 92%;
+    --secondary-foreground: 20 14% 8%;
+    --muted: 35 18% 93%;
+    --muted-foreground: 25 8% 40%;
+    --accent: 38 45% 55%;
+    --accent-foreground: 20 14% 8%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 40 33% 97%;
+    --border: 30 18% 85%;
+    --input: 30 18% 85%;
+    --ring: 38 45% 55%;
+    --chart-1: 38 45% 55%;
+    --chart-2: 20 14% 20%;
+    --chart-3: 30 20% 60%;
+    --chart-4: 45 60% 65%;
+    --chart-5: 25 10% 40%;
+    --radius: 0.125rem;
+    --sidebar-background: 40 33% 97%;
+    --sidebar-foreground: 20 14% 8%;
+    --sidebar-primary: 20 14% 8%;
+    --sidebar-primary-foreground: 40 33% 97%;
+    --sidebar-accent: 35 20% 92%;
+    --sidebar-accent-foreground: 20 14% 8%;
+    --sidebar-border: 30 18% 85%;
+    --sidebar-ring: 38 45% 55%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0.01em;
+  }
+  h1,h2,h3,h4,h5 { font-family: 'Cormorant Garamond', 'Didot', 'Times New Roman', serif; font-weight: 400; letter-spacing: -0.01em; }
+  .font-serif { font-family: 'Cormorant Garamond', 'Didot', 'Times New Roman', serif; }
+  .font-display { font-family: 'Cormorant Garamond', 'Didot', 'Times New Roman', serif; font-weight: 300; }
+  .tracking-luxe { letter-spacing: 0.3em; }
+  .tracking-editorial { letter-spacing: 0.15em; }
+}
+
+@layer utilities {
+  .fade-in { animation: fadeIn 0.6s ease-out both; }
+  .slow-fade { animation: fadeIn 1.2s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity:1; transform: none; } }
+  .hover-lift { transition: transform 0.6s cubic-bezier(0.16,1,0.3,1), box-shadow 0.6s ease; }
+  .hover-lift:hover { transform: translateY(-4px); }
+  .btn-luxe { position: relative; overflow: hidden; }
+  .btn-luxe::after { content:''; position:absolute; inset:0; background: currentColor; opacity:0; transition: opacity .4s ease; }
+  .btn-luxe:hover::after { opacity: 0.06; }
+  .img-zoom { overflow: hidden; }
+  .img-zoom img { transition: transform 1.4s cubic-bezier(0.16,1,0.3,1); }
+  .img-zoom:hover img { transform: scale(1.06); }
+  .divider-gold { height:1px; background: linear-gradient(90deg, transparent, hsl(var(--accent)) 50%, transparent); }
+}
