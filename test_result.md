@@ -236,6 +236,9 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "testing"
+    message: |
+      All 21 backend endpoints tested end-to-end and PASSING. Admin seeded correctly. Mocked email/payment behavior verified as intentional per user spec. No _id leaks. Auth 401/403 enforcement correct. Order status history append works. All filters/search/sort work.
   - agent: "main"
     message: |
       Backend is a single Next.js catch-all route at app/api/[[...path]]/route.js using MongoDB and Node crypto (no bcrypt/jwt libs).
