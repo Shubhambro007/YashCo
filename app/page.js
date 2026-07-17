@@ -27,6 +27,23 @@ const useApp = () => useContext(AppCtx)
 const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
 
+// Map friendly colour names to CSS colours for swatch previews
+function colorHex(name){
+  const map = {
+    noir:'#0a0a0a', black:'#0a0a0a', jet:'#000000', ivory:'#f5efe6', white:'#ffffff', cream:'#f5efe6',
+    champagne:'#dcc8a1', gold:'#c8a15b', beige:'#c9b898', sand:'#d9c7a2', camel:'#b48a5b',
+    charcoal:'#333333', grey:'#808080', gray:'#808080', silver:'#c0c0c0',
+    navy:'#1e2a44', midnight:'#1a1a2e', blue:'#3d5a80', teal:'#2a6f6b',
+    emerald:'#046a38', forest:'#1e3d2f', olive:'#556b2f', sage:'#a3b18a',
+    burgundy:'#800020', maroon:'#800000', red:'#b0202e', wine:'#7b1e2b', rose:'#c98b8b', blush:'#f2d3d0',
+    pink:'#e8b4bc', mauve:'#a37f8f', lilac:'#c8a2c8', purple:'#6b3fa0', plum:'#5d3754',
+    brown:'#5b3a1f', chocolate:'#3d2418', tan:'#b48a5b', mocha:'#4a2f1d',
+    yellow:'#e5b83b', mustard:'#c99a2b', orange:'#c1622b',
+  }
+  const key = String(name||'').toLowerCase().trim()
+  return map[key] || '#8b7b5a'
+}
+
 // ---------- Root ----------
 export default function App() {
   const [view, setView] = useState({ name: 'home', params: {} })
@@ -38,6 +55,8 @@ export default function App() {
   const [wishlist, setWishlist] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+  const [transparentLogo, setTransparentLogo] = useState(null)
+  const [allProducts, setAllProducts] = useState([])
 
   const api = useCallback(async (path, opts = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
@@ -81,6 +100,50 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('yash_cart', JSON.stringify(cart)) }, [cart])
 
+  // Fetch all products once (for dynamic filter facets)
+  useEffect(() => {
+    api('/products').then(r => setAllProducts(r.products || [])).catch(()=>{})
+  }, [api])
+
+  // Process logo to remove white background (canvas-based transparent conversion)
+  useEffect(() => {
+    if (!settings?.logoUrl) return
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const d = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        for (let i = 0; i < d.data.length; i += 4) {
+          const r = d.data[i], g = d.data[i+1], b = d.data[i+2]
+          if (r > 225 && g > 225 && b > 225) d.data[i+3] = 0
+          else if (r > 200 && g > 200 && b > 200) d.data[i+3] = Math.max(0, 255 - Math.round(((r+g+b)/3 - 200) * 10))
+        }
+        ctx.putImageData(d, 0, 0)
+        setTransparentLogo(canvas.toDataURL('image/png'))
+      } catch (e) { /* CORS blocked, keep original with mix-blend */ }
+    }
+    img.src = settings.logoUrl
+  }, [settings?.logoUrl])
+
+  // Hidden admin portal: navigate to admin login when URL hash is #atelier
+  useEffect(() => {
+    const check = () => {
+      if (typeof window === 'undefined') return
+      const h = window.location.hash
+      if (h === '#atelier' || h === '#admin' || h === '#admin-portal') {
+        setView({ name: 'adminLogin', params: {} })
+      }
+    }
+    check()
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+  }, [])
+
   const setAuth = (tok, u) => {
     if (tok) localStorage.setItem('yash_token', tok); else localStorage.removeItem('yash_token')
     setToken(tok || null); setUser(u || null)
@@ -110,7 +173,7 @@ export default function App() {
     api('/wishlist').then(r => setWishlist(r.productIds || [])).catch(()=>{})
   }, [user, api])
 
-  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen }
+  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts }
 
   if (!settings) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader /></div>
 
@@ -132,6 +195,7 @@ export default function App() {
         {view.name === 'register' && <RegisterView />}
         {view.name === 'forgot' && <ForgotView />}
         {view.name === 'reset' && <ResetView />}
+        {view.name === 'adminLogin' && <AdminLoginView />}
         {view.name === 'concierge' && <ConciergeView />}
         {view.name === 'dashboard' && <DashboardView />}
         {view.name === 'admin' && <AdminView />}
@@ -156,7 +220,7 @@ function AnnouncementBar() {
 }
 
 function Header() {
-  const { navigate, user, cart, settings, setCartOpen, setMenuOpen, view } = useApp()
+  const { navigate, user, cart, settings, setCartOpen, setMenuOpen, view, transparentLogo } = useApp()
   const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -164,12 +228,13 @@ function Header() {
   }, [])
   const cartCount = cart.reduce((s, x) => s + x.qty, 0)
   const transparent = view.name === 'home' && !scrolled
+  const logoSrc = transparentLogo || settings.logoUrl
   return (
     <header className={cx('sticky top-0 z-40 transition-all', transparent ? 'bg-transparent' : 'bg-background/90 backdrop-blur-md border-b border-border')}>
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-6 flex-1">
-          <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className="w-5 h-5"/></button>
-          <nav className="hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase">
+          <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'text-white')}/></button>
+          <nav className={cx('hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase', transparent && 'text-white')}>
             <button onClick={() => navigate('shop')} className="hover:text-accent transition-colors">Shop</button>
             <button onClick={() => navigate('shop', { collection: 'womenswear' })} className="hover:text-accent transition-colors">Women</button>
             <button onClick={() => navigate('shop', { collection: 'menswear' })} className="hover:text-accent transition-colors">Men</button>
@@ -178,9 +243,9 @@ function Header() {
           </nav>
         </div>
         <button onClick={() => navigate('home')} className="flex items-center justify-center">
-          <img src={settings.logoUrl} alt={settings.brand} className="h-12 md:h-14 object-contain" />
+          <img src={logoSrc} alt={settings.brand} className={cx('h-12 md:h-14 object-contain', !transparentLogo && 'mix-blend-multiply', transparent && 'brightness-0 invert')} />
         </button>
-        <div className="flex items-center gap-4 flex-1 justify-end text-foreground">
+        <div className={cx('flex items-center gap-4 flex-1 justify-end', transparent ? 'text-white' : 'text-foreground')}>
           <button onClick={() => navigate('shop')} className="hidden md:block"><Search className="w-4 h-4"/></button>
           {user
             ? <button onClick={() => navigate(user.role === 'admin' ? 'admin' : 'dashboard')} className="text-[11px] tracking-editorial uppercase hidden md:flex items-center gap-2"><User className="w-4 h-4"/> {user.role === 'admin' ? 'Admin' : 'Account'}</button>
@@ -375,6 +440,12 @@ function ProductCard({ p }) {
         <div className="text-sm">
           {p.salePrice ? <><span className="text-accent">{money(p.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
         </div>
+        {p.colors?.length > 0 && (
+          <div className="flex gap-1 pt-1">
+            {p.colors.slice(0,5).map(c => <span key={c} title={c} className="w-2.5 h-2.5 rounded-full border border-border" style={{background: colorHex(c)}}/>)}
+            {p.colors.length > 5 && <span className="text-[10px] text-muted-foreground ml-1">+{p.colors.length-5}</span>}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -382,7 +453,7 @@ function ProductCard({ p }) {
 
 // ---------- Shop ----------
 function ShopView() {
-  const { api, view, collections, navigate } = useApp()
+  const { api, view, collections, allProducts } = useApp()
   const [products, setProducts] = useState([])
   const [filters, setFilters] = useState({ collection: view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
   const [loading, setLoading] = useState(true)
@@ -394,8 +465,12 @@ function ShopView() {
     api(`/products?${q}`).then(r => { setProducts(r.products); setLoading(false) }).catch(()=>setLoading(false))
   }, [filters, api])
 
-  const allColors = ['Noir','Ivory','Champagne']
-  const allSizes = ['XS','S','M','L','XL']
+  // Dynamic facets: unique colors/sizes derived from the entire catalog
+  const source = allProducts.length ? allProducts : products
+  const allColors = useMemo(()=>Array.from(new Set(source.flatMap(p=>p.colors||[]))).sort(), [source])
+  const allSizes = useMemo(()=>Array.from(new Set(source.flatMap(p=>p.sizes||[]))).sort((a,b)=>['XS','S','M','L','XL','XXL'].indexOf(a)-['XS','S','M','L','XL','XXL'].indexOf(b)), [source])
+  const filteredForCollection = filters.collection ? source.filter(p=>p.collection===filters.collection) : source
+  const collectionColors = useMemo(()=>Array.from(new Set(filteredForCollection.flatMap(p=>p.colors||[]))).sort(), [filteredForCollection])
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 md:py-20">
@@ -425,7 +500,8 @@ function ShopView() {
           <div>
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour</Label>
             <div className="mt-3 space-y-1">
-              {allColors.map(c => <button key={c} onClick={()=>setFilters(f=>({...f,color:f.color===c?'':c}))} className={cx('block text-sm', filters.color===c && 'text-accent')}>{c}</button>)}
+              {collectionColors.map(c => <button key={c} onClick={()=>setFilters(f=>({...f,color:f.color===c?'':c}))} className={cx('flex items-center gap-2 text-sm', filters.color===c && 'text-accent')}><span className="inline-block w-3 h-3 rounded-full border border-border" style={{background: colorHex(c)}}/>{c}</button>)}
+              {collectionColors.length === 0 && <span className="text-xs text-muted-foreground">No colours</span>}
             </div>
           </div>
           <div>
@@ -512,8 +588,12 @@ function ProductView() {
           </div>
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
-            <div className="mt-3 flex gap-2">
-              {product.colors?.map(c => <button key={c} onClick={()=>setColor(c)} className={cx('px-4 py-2 border text-xs', color===c?'border-primary bg-primary text-primary-foreground':'border-border')}>{c}</button>)}
+            <div className="mt-3 flex gap-2 flex-wrap">
+              {product.colors?.map(c => (
+                <button key={c} onClick={()=>setColor(c)} className={cx('flex items-center gap-2 px-3 py-2 border text-xs', color===c?'border-primary bg-primary text-primary-foreground':'border-border')}>
+                  <span className="inline-block w-3.5 h-3.5 rounded-full border border-border" style={{background: colorHex(c)}}/>{c}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -748,12 +828,41 @@ function LoginView() {
           <button className="underline" onClick={()=>navigate('forgot')}>Forgot password?</button>
           <button className="underline" onClick={()=>navigate('register')}>Create an account</button>
         </div>
-        <div className="text-xs text-muted-foreground bg-muted/40 p-3 mt-4 border border-border">
-          <div className="tracking-editorial uppercase mb-1">Admin</div>
-          yashcoofficial@gmail.com · Admin@123
-        </div>
       </div>
     </AuthLayout>
+  )
+}
+
+function AdminLoginView() {
+  const { api, setAuth, navigate } = useApp()
+  const [form, setForm] = useState({ email:'', password:'' })
+  const [loading, setLoading] = useState(false)
+  const submit = async () => {
+    setLoading(true)
+    try {
+      const r = await api('/auth/login', { method:'POST', body: form })
+      if (r.user.role !== 'admin') { toast.error('This portal is restricted to atelier staff.'); setLoading(false); return }
+      setAuth(r.token, r.user)
+      if (typeof window !== 'undefined') history.replaceState(null, '', window.location.pathname)
+      toast.success('Welcome to the Atelier'); navigate('admin')
+    } catch (e) { toast.error(e.message) } finally { setLoading(false) }
+  }
+  return (
+    <div className="min-h-screen -mt-20 bg-primary text-primary-foreground flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="text-center mb-10">
+          <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">Restricted Access</div>
+          <h1 className="font-serif text-5xl">Atelier Portal</h1>
+          <p className="text-primary-foreground/60 mt-3 text-sm">This entrance is reserved for members of the YASH atelier.</p>
+        </div>
+        <div className="space-y-4">
+          <Input placeholder="Atelier Email" className="rounded-none h-12 bg-transparent border-primary-foreground/30 text-primary-foreground placeholder:text-primary-foreground/50" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/>
+          <Input type="password" placeholder="Password" className="rounded-none h-12 bg-transparent border-primary-foreground/30 text-primary-foreground placeholder:text-primary-foreground/50" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/>
+          <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs bg-accent text-accent-foreground hover:bg-accent/90" onClick={submit}>{loading?'Entering…':'Enter Atelier'}</Button>
+          <button className="text-[11px] tracking-editorial uppercase text-primary-foreground/50 mx-auto block mt-6" onClick={()=>{ if (typeof window!=='undefined') history.replaceState(null,'',window.location.pathname); navigate('home')}}>← Return to Boutique</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1364,14 +1473,11 @@ function AdminSettings() {
 
 // ---------- Footer ----------
 function Footer() {
-  const { settings, navigate } = useApp()
+  const { settings, navigate, transparentLogo } = useApp()
+  const logoSrc = transparentLogo || settings.logoUrl
   return (
     <footer className="bg-primary text-primary-foreground py-16 mt-20">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid md:grid-cols-4 gap-10">
-        <div>
-          <img src={settings.logoUrl} alt={settings.brand} className="h-16 mb-4 invert brightness-0"/>
-          <div className="text-[11px] tracking-luxe uppercase text-primary-foreground/60">{settings.slogan}</div>
-        </div>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid md:grid-cols-3 gap-10">
         <div>
           <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/60 mb-4">Boutique</div>
           <div className="space-y-2 text-sm">
@@ -1397,9 +1503,10 @@ function Footer() {
           <div className="flex gap-4 mt-6"><Instagram className="w-4 h-4"/><Facebook className="w-4 h-4"/><Twitter className="w-4 h-4"/></div>
         </div>
       </div>
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 mt-12 pt-8 border-t border-primary-foreground/10 text-[11px] tracking-editorial uppercase text-primary-foreground/50 flex justify-between flex-wrap gap-2">
-        <div>{settings.footerCopy}</div>
-        <div>{settings.slogan}</div>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 mt-14 pt-10 border-t border-primary-foreground/10 flex flex-col items-center gap-6">
+        <img src={logoSrc} alt={settings.brand} className={cx('h-20 md:h-24 object-contain brightness-0 invert', !transparentLogo && 'mix-blend-screen')} />
+        <div className="text-[11px] tracking-luxe uppercase text-primary-foreground/70">{settings.slogan}</div>
+        <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/50 text-center">{settings.footerCopy}</div>
       </div>
     </footer>
   )
