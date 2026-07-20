@@ -7,7 +7,13 @@ import { v4 as uuidv4 } from 'uuid'
 let clientPromise
 function getClient() {
   if (!clientPromise) {
-    const client = new MongoClient(process.env.MONGO_URL)
+    const client = new MongoClient(process.env.MONGO_URL, {
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      tlsAllowInvalidHostnames: true,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+    })
     clientPromise = client.connect()
   }
   return clientPromise
